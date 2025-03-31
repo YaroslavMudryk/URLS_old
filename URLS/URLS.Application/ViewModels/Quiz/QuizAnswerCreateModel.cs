@@ -1,8 +1,7 @@
-﻿namespace URLS.Application.ViewModels.Quiz
+﻿namespace URLS.Application.ViewModels.Quiz;
+
+public class QuizAnswerCreateModel
 {
-    public class QuizAnswerCreateModel
-    {
-        public Guid QuizId { get; set; }
-        public List<QuizAnswerResponse> Responses { get; set; }
-    }
+    public Guid QuizId { get; set; }
+    public List<QuizAnswerResponse> Responses { get; set; }
 }

@@ -9,103 +9,102 @@ using URLS.Application.Services.Interfaces;
 using URLS.Constants.Localisation;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Infrastructure.IoC
+namespace URLS.Infrastructure.IoC;
+
+public static class DependencyContainer
 {
-    public static class DependencyContainer
+    public static IServiceCollection AddURLSServices(this IServiceCollection services, IConfiguration configuration)
     {
-        public static IServiceCollection AddURLSServices(this IServiceCollection services, IConfiguration configuration)
+        #region Db
+        services.AddDbContext<URLSDbContext>(options =>
         {
-            #region Db
-            services.AddDbContext<URLSDbContext>(options =>
-            {
-                //options.UseSqlServer(configuration.GetConnectionString("SqlServer"));
-                options.UseNpgsql(configuration.GetConnectionString("PostgreSQL"));
-                //options.UseSqlite(configuration.GetConnectionString("Sqlite"));
-                options.LogTo(Console.WriteLine, Microsoft.Extensions.Logging.LogLevel.Error);
-            });            
-            #endregion
+            //options.UseSqlServer(configuration.GetConnectionString("SqlServer"));
+            options.UseNpgsql(configuration.GetConnectionString("PostgreSQL"));
+            //options.UseSqlite(configuration.GetConnectionString("Sqlite"));
+            options.LogTo(Console.WriteLine, Microsoft.Extensions.Logging.LogLevel.Error);
+        });            
+        #endregion
 
-            #region Automapper
+        #region Automapper
 
-            services.AddSingleton(new MapperConfiguration(mc =>
-            {
-                mc.AddProfile(new Application.ViewModels.Mapper());
-            }).CreateMapper());
+        services.AddSingleton(new MapperConfiguration(mc =>
+        {
+            mc.AddProfile(new Application.ViewModels.Mapper());
+        }).CreateMapper());
 
-            #endregion
+        #endregion
 
-            #region Services
+        #region Services
 
-            services.AddScoped<ISeederService, DUTSeederService>();
-            services.AddScoped<IUniversityService, UniversityService>();
-            services.AddScoped<IIdentityService, HttpIdentityService>();
-            services.AddScoped<IFacultyService, FacultyService>();
-            services.AddScoped<ISpecialtyService, SpecialtyService>();
-            services.AddScoped<IAppService, AppService>();
-            services.AddScoped<IGroupService, GroupService>();
-            services.AddScoped<IUserService, UserService>();
-            services.AddScoped<ITokenService, TokenService>();
-            services.AddScoped<IAuthenticationService, AuthenticationService>();
-            services.AddScoped<ILocationService, LocationService>();
-            services.AddScoped<ISessionService, SessionService>();
-            services.AddScoped<INotificationService, NotificationService>();
-            services.AddScoped<IDiplomaService, DiplomaService>();
-            services.AddScoped<IPostService, PostService>();
-            services.AddScoped<ICommentService, CommentService>();
-            services.AddScoped<ISubjectService, SubjectService>();
-            services.AddScoped<IRoleService, RoleService>();
-            services.AddScoped<IClaimService, ClaimService>();
-            services.AddScoped<ISettingService, SettingService>();
-            services.AddScoped<ILessonService, LessonService>();
-            services.AddScoped<ITimetableService, TimetableService>();
-            services.AddScoped<IAuditService, AuditService>();
-            services.AddScoped<IReportService, ReportService>();
-            services.AddScoped<IJournalService, JournalService>();
-            services.AddScoped<IGroupMemberService, GroupMemberService>();
-            services.AddScoped<IGroupInviteService, GroupInviteService>();
-            services.AddScoped<IGroupRoleService, GroupRoleService>();
-            services.AddScoped<IPermissionPostService, PermissionPostService>();
-            services.AddScoped<IPermissionGroupInviteService, PermissionGroupInviteService>();
-            services.AddScoped<IPermissionCommentService, PermissionCommentService>();
-            services.AddScoped<IQuizService, QuizService>();
-            services.AddScoped<ICommonService, CommonService>();
-            services.AddScoped<IReactionService, ReactionService>();
-            services.AddSingleton<IPushNotificationService, FirebasePushNotificationService>();
-            services.AddScoped<IExportService, ExportService>();
-            services.AddScoped<IWidgetService, WidgetService>();
+        services.AddScoped<ISeederService, DUTSeederService>();
+        services.AddScoped<IUniversityService, UniversityService>();
+        services.AddScoped<IIdentityService, HttpIdentityService>();
+        services.AddScoped<IFacultyService, FacultyService>();
+        services.AddScoped<ISpecialtyService, SpecialtyService>();
+        services.AddScoped<IAppService, AppService>();
+        services.AddScoped<IGroupService, GroupService>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<ILocationService, LocationService>();
+        services.AddScoped<ISessionService, SessionService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IDiplomaService, DiplomaService>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<ISubjectService, SubjectService>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<IClaimService, ClaimService>();
+        services.AddScoped<ISettingService, SettingService>();
+        services.AddScoped<ILessonService, LessonService>();
+        services.AddScoped<ITimetableService, TimetableService>();
+        services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IJournalService, JournalService>();
+        services.AddScoped<IGroupMemberService, GroupMemberService>();
+        services.AddScoped<IGroupInviteService, GroupInviteService>();
+        services.AddScoped<IGroupRoleService, GroupRoleService>();
+        services.AddScoped<IPermissionPostService, PermissionPostService>();
+        services.AddScoped<IPermissionGroupInviteService, PermissionGroupInviteService>();
+        services.AddScoped<IPermissionCommentService, PermissionCommentService>();
+        services.AddScoped<IQuizService, QuizService>();
+        services.AddScoped<ICommonService, CommonService>();
+        services.AddScoped<IReactionService, ReactionService>();
+        services.AddSingleton<IPushNotificationService, FirebasePushNotificationService>();
+        services.AddScoped<IExportService, ExportService>();
+        services.AddScoped<IWidgetService, WidgetService>();
 
-            services.AddScoped<ILocalizeService, LocalizeService>();
+        services.AddScoped<ILocalizeService, LocalizeService>();
 
-            services.AddScoped<IImportService, ImportService>();
-            #endregion
+        services.AddScoped<IImportService, ImportService>();
+        #endregion
 
-            #region Managers
+        #region Managers
 
-            services.AddSingleton<ISessionManager, SessionManager>();
-            services.AddScoped<IUserManager, UserManager>();
+        services.AddSingleton<ISessionManager, SessionManager>();
+        services.AddScoped<IUserManager, UserManager>();
 
-            #endregion
+        #endregion
 
-            #region Common
+        #region Common
 
-            services.AddHttpContextAccessor();
+        services.AddHttpContextAccessor();
 
-            services.AddHttpClient("UaData", httpClient =>
-            {
-                httpClient.BaseAddress = new Uri("https://uadata.net/");
-            });
+        services.AddHttpClient("UaData", httpClient =>
+        {
+            httpClient.BaseAddress = new Uri("https://uadata.net/");
+        });
 
-            services.AddMemoryCache();
+        services.AddMemoryCache();
 
-            #endregion
+        #endregion
 
-            #region Libraries
+        #region Libraries
 
-            services.AddDeviceDetector();
+        services.AddDeviceDetector();
 
-            #endregion
+        #endregion
 
-            return services;
-        }
+        return services;
     }
 }

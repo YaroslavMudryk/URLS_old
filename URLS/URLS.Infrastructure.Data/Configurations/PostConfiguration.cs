@@ -3,16 +3,15 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Extensions;
 
-namespace URLS.Infrastructure.Data.Configurations
+namespace URLS.Infrastructure.Data.Configurations;
+
+public class PostConfiguration : IEntityTypeConfiguration<Post>
 {
-    public class PostConfiguration : IEntityTypeConfiguration<Post>
+    public void Configure(EntityTypeBuilder<Post> builder)
     {
-        public void Configure(EntityTypeBuilder<Post> builder)
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(s => s.AvailableReactionIds).HasConversion(
-                v => v.ToJson(),
-                v => v.FromJson<int[]>());
-        }
+        builder.HasKey(x => x.Id);
+        builder.Property(s => s.AvailableReactionIds).HasConversion(
+            v => v.ToJson(),
+            v => v.FromJson<int[]>());
     }
 }

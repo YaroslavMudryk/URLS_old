@@ -10,102 +10,93 @@ using URLS.Constants.Extensions;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class GroupInviteService(
+    URLSDbContext db,
+    IMapper mapper,
+    IIdentityService identityService,
+    IPermissionGroupInviteService permissionGroupInviteService) : IGroupInviteService
 {
-    public class GroupInviteService : IGroupInviteService
+    public async Task<Result<GroupInviteViewModel>> CreateGroupInviteAsync(GroupInviteCreateModel model)
     {
-        private readonly URLSDbContext _db;
-        private readonly IMapper _mapper;
-        private readonly IIdentityService _identityService;
-        private readonly IPermissionGroupInviteService _permissionGroupInviteService;
-        public GroupInviteService(URLSDbContext db, IMapper mapper, IIdentityService identityService, IPermissionGroupInviteService permissionGroupInviteService)
+        if(!await permissionGroupInviteService.CanCreateInviteAsync(model.GroupId.Value))
+            return Result<GroupInviteViewModel>.Forbiden();
+
+        if (!await db.Groups.AnyAsync(s => s.Id == model.GroupId))
+            return Result<GroupInviteViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
+
+        if (await db.GroupInvites.AsNoTracking().CountAsync(s => s.GroupId == model.GroupId) >= 5)
+            return Result<GroupInviteViewModel>.Error("One group must be have max 5 invites");
+
+        var newGroupInvite = new GroupInvite
         {
-            _db = db;
-            _mapper = mapper;
-            _identityService = identityService;
-            _permissionGroupInviteService = permissionGroupInviteService;
-        }
+            ActiveFrom = model.ActiveFrom,
+            ActiveTo = model.ActiveTo,
+            Name = model.Name,
+            IsActive = model.IsActive,
+            CodeJoin = Generator.CreateGroupInviteCode(),
+            GroupId = model.GroupId.Value,
+        };
+        newGroupInvite.PrepareToCreate(identityService);
+        await db.GroupInvites.AddAsync(newGroupInvite);
+        await db.SaveChangesAsync();
+        return Result<GroupInviteViewModel>.Created(mapper.Map<GroupInviteViewModel>(newGroupInvite));
+    }
 
-        public async Task<Result<GroupInviteViewModel>> CreateGroupInviteAsync(GroupInviteCreateModel model)
-        {
-            if(!await _permissionGroupInviteService.CanCreateInviteAsync(model.GroupId.Value))
-                return Result<GroupInviteViewModel>.Forbiden();
+    public async Task<Result<List<GroupInviteViewModel>>> GetGroupInvitesByGroupIdAsync(int groupId)
+    {
+        if (!await permissionGroupInviteService.CanViewInviteAsync(groupId))
+            return Result<List<GroupInviteViewModel>>.Forbiden();
 
-            if (!await _db.Groups.AnyAsync(s => s.Id == model.GroupId))
-                return Result<GroupInviteViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
+        var groupInvitesFromDb = await db.GroupInvites
+            .AsNoTracking()
+            .Where(x => x.GroupId == groupId)
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync();
 
-            if (await _db.GroupInvites.AsNoTracking().CountAsync(s => s.GroupId == model.GroupId) >= 5)
-                return Result<GroupInviteViewModel>.Error("One group must be have max 5 invites");
+        var groupInvitesToViews = mapper.Map<List<GroupInviteViewModel>>(groupInvitesFromDb);
 
-            var newGroupInvite = new GroupInvite
-            {
-                ActiveFrom = model.ActiveFrom,
-                ActiveTo = model.ActiveTo,
-                Name = model.Name,
-                IsActive = model.IsActive,
-                CodeJoin = Generator.CreateGroupInviteCode(),
-                GroupId = model.GroupId.Value,
-            };
-            newGroupInvite.PrepareToCreate(_identityService);
-            await _db.GroupInvites.AddAsync(newGroupInvite);
-            await _db.SaveChangesAsync();
-            return Result<GroupInviteViewModel>.Created(_mapper.Map<GroupInviteViewModel>(newGroupInvite));
-        }
+        var totalCount = await db.GroupInvites.CountAsync(x => x.GroupId == groupId);
 
-        public async Task<Result<List<GroupInviteViewModel>>> GetGroupInvitesByGroupIdAsync(int groupId)
-        {
-            if (!await _permissionGroupInviteService.CanViewInviteAsync(groupId))
-                return Result<List<GroupInviteViewModel>>.Forbiden();
+        return Result<List<GroupInviteViewModel>>.SuccessList(groupInvitesToViews, Meta.FromMeta(totalCount, 0, 0));
+    }
 
-            var groupInvitesFromDb = await _db.GroupInvites
-                .AsNoTracking()
-                .Where(x => x.GroupId == groupId)
-                .OrderByDescending(s => s.CreatedAt)
-                .ToListAsync();
+    public async Task<Result<bool>> RemoveGroupInviteAsync(int groupId, Guid groupInviteId)
+    {
+        if (!await permissionGroupInviteService.CanRemoveInviteAsync(groupId))
+            return Result<bool>.Forbiden();
 
-            var groupInvitesToViews = _mapper.Map<List<GroupInviteViewModel>>(groupInvitesFromDb);
+        var groupInvite = await db.GroupInvites.AsNoTracking().FirstOrDefaultAsync(x => x.Id == groupInviteId);
+        if (groupInvite == null)
+            return Result<bool>.NotFound(typeof(Group).NotFoundMessage(groupId));
 
-            var totalCount = await _db.GroupInvites.CountAsync(x => x.GroupId == groupId);
+        if (groupInvite.GroupId != groupId)
+            return Result<bool>.Error("Incorrect groupId");
 
-            return Result<List<GroupInviteViewModel>>.SuccessList(groupInvitesToViews, Meta.FromMeta(totalCount, 0, 0));
-        }
+        db.GroupInvites.Remove(groupInvite);
+        await db.SaveChangesAsync();
+        return Result<bool>.Success();
+    }
 
-        public async Task<Result<bool>> RemoveGroupInviteAsync(int groupId, Guid groupInviteId)
-        {
-            if (!await _permissionGroupInviteService.CanRemoveInviteAsync(groupId))
-                return Result<bool>.Forbiden();
+    public async Task<Result<GroupInviteViewModel>> UpdateGroupInviteAsync(GroupInviteEditModel model)
+    {
+        if(!await permissionGroupInviteService.CanUpdateInviteAsync(model.GroupId.Value))
+            return Result<GroupInviteViewModel>.Forbiden();
 
-            var groupInvite = await _db.GroupInvites.AsNoTracking().FirstOrDefaultAsync(x => x.Id == groupInviteId);
-            if (groupInvite == null)
-                return Result<bool>.NotFound(typeof(Group).NotFoundMessage(groupId));
+        var groupInviteFromDb = await db.GroupInvites.FindAsync(model.Id);
+        if (groupInviteFromDb == null)
+            return Result<GroupInviteViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
 
-            if (groupInvite.GroupId != groupId)
-                return Result<bool>.Error("Incorrect groupId");
+        groupInviteFromDb.Name = model.Name;
+        groupInviteFromDb.ActiveFrom = model.ActiveFrom;
+        groupInviteFromDb.ActiveTo = model.ActiveTo;
+        groupInviteFromDb.IsActive = model.IsActive;
+        groupInviteFromDb.PrepareToUpdate(identityService);
 
-            _db.GroupInvites.Remove(groupInvite);
-            await _db.SaveChangesAsync();
-            return Result<bool>.Success();
-        }
+        db.GroupInvites.Update(groupInviteFromDb);
+        await db.SaveChangesAsync();
 
-        public async Task<Result<GroupInviteViewModel>> UpdateGroupInviteAsync(GroupInviteEditModel model)
-        {
-            if(!await _permissionGroupInviteService.CanUpdateInviteAsync(model.GroupId.Value))
-                return Result<GroupInviteViewModel>.Forbiden();
-
-            var groupInviteFromDb = await _db.GroupInvites.FindAsync(model.Id);
-            if (groupInviteFromDb == null)
-                return Result<GroupInviteViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
-
-            groupInviteFromDb.Name = model.Name;
-            groupInviteFromDb.ActiveFrom = model.ActiveFrom;
-            groupInviteFromDb.ActiveTo = model.ActiveTo;
-            groupInviteFromDb.IsActive = model.IsActive;
-            groupInviteFromDb.PrepareToUpdate(_identityService);
-
-            _db.GroupInvites.Update(groupInviteFromDb);
-            await _db.SaveChangesAsync();
-
-            return Result<GroupInviteViewModel>.SuccessWithData(_mapper.Map<GroupInviteViewModel>(groupInviteFromDb));
-        }
+        return Result<GroupInviteViewModel>.SuccessWithData(mapper.Map<GroupInviteViewModel>(groupInviteFromDb));
     }
 }

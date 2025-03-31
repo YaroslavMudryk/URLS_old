@@ -1,10 +1,9 @@
-﻿namespace URLS.Application.ViewModels.Audit
+﻿namespace URLS.Application.ViewModels.Audit;
+
+public class AuditCreateModel
 {
-    public class AuditCreateModel
-    {
-        public string EntityId { get; set; }
-        public string Entity { get; set; }
-        public object Before { get; set; }
-        public object After { get; set; }
-    }
+    public string EntityId { get; set; }
+    public string Entity { get; set; }
+    public object Before { get; set; }
+    public object After { get; set; }
 }

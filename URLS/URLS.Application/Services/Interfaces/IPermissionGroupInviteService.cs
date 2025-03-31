@@ -1,10 +1,9 @@
-﻿namespace URLS.Application.Services.Interfaces
+﻿namespace URLS.Application.Services.Interfaces;
+
+public interface IPermissionGroupInviteService
 {
-    public interface IPermissionGroupInviteService
-    {
-        Task<bool> CanCreateInviteAsync(int groupId);
-        Task<bool> CanViewInviteAsync(int groupId);
-        Task<bool> CanRemoveInviteAsync(int groupId);
-        Task<bool> CanUpdateInviteAsync(int groupId);
-    }
+    Task<bool> CanCreateInviteAsync(int groupId);
+    Task<bool> CanViewInviteAsync(int groupId);
+    Task<bool> CanRemoveInviteAsync(int groupId);
+    Task<bool> CanUpdateInviteAsync(int groupId);
 }

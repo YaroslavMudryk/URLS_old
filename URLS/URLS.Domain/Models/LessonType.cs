@@ -1,12 +1,11 @@
-﻿namespace URLS.Domain.Models
+﻿namespace URLS.Domain.Models;
+
+public enum LessonType
 {
-    public enum LessonType
-    {
-        Lecture = 1,
-        Laboratory,
-        Practical,
-        Individual,
-        Offset,
-        Exam
-    }
+    Lecture = 1,
+    Laboratory,
+    Practical,
+    Individual,
+    Offset,
+    Exam
 }

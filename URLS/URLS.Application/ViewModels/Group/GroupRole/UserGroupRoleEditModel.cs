@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Group.GroupRole
+namespace URLS.Application.ViewModels.Group.GroupRole;
+
+public class UserGroupRoleEditModel : UserGroupRoleCreateModel
 {
-    public class UserGroupRoleEditModel : UserGroupRoleCreateModel
-    {
-        [Required]
-        public int Id { get; set; }
-    }
+    [Required]
+    public int Id { get; set; }
 }

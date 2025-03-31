@@ -9,107 +9,97 @@ using URLS.Constants.Extensions;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class CommentService(
+    URLSDbContext db,
+    IMapper mapper,
+    IIdentityService identityService,
+    IPermissionCommentService permissionCommentService,
+    ICommonService commonService) : ICommentService
 {
-    public class CommentService : ICommentService
+    public async Task<Result<CommentViewModel>> CreateCommentAsync(CommentCreateModel model)
     {
-        private readonly URLSDbContext _db;
-        private readonly IMapper _mapper;
-        private readonly IIdentityService _identityService;
-        private readonly IPermissionCommentService _permissionCommentService;
-        private readonly ICommonService _commonService;
-        public CommentService(URLSDbContext db, IMapper mapper, IIdentityService identityService, IPermissionCommentService permissionCommentService, ICommonService commonService)
+        if (!await commonService.IsExistAsync<Group>(s => s.Id == model.GroupId))
+            return Result<CommentViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
+
+        if (!await commonService.IsExistAsync<Post>(s => s.Id == model.PostId))
+            return Result<CommentViewModel>.NotFound(typeof(Post).NotFoundMessage(model.PostId));
+
+        if (!await permissionCommentService.CanCreateCommentAsync(model.GroupId))
+            return Result<CommentViewModel>.Forbiden();
+
+        var newComment = new Comment
         {
-            _db = db;
-            _mapper = mapper;
-            _identityService = identityService;
-            _permissionCommentService = permissionCommentService;
-            _commonService = commonService;
-        }
+            IsPublic = model.IsPublic,
+            PostId = model.PostId,
+            UserId = identityService.GetUserId(),
+            Text = model.Text
+        };
+        newComment.PrepareToCreate(identityService);
+        await db.Comments.AddAsync(newComment);
+        await db.SaveChangesAsync();
+        return Result<CommentViewModel>.Created(mapper.Map<CommentViewModel>(newComment));
+    }
 
-        public async Task<Result<CommentViewModel>> CreateCommentAsync(CommentCreateModel model)
-        {
-            if (!await _commonService.IsExistAsync<Group>(s => s.Id == model.GroupId))
-                return Result<CommentViewModel>.NotFound(typeof(Group).NotFoundMessage(model.GroupId));
+    public async Task<Result<List<CommentViewModel>>> GetCommentsByPostIdAsync(int groupId, int postId, int skip = 0, int count = 20)
+    {
+        if (!await db.Posts.AnyAsync(s => s.Id == postId && s.GroupId == groupId))
+            return Result<List<CommentViewModel>>.NotFound(typeof(Post).NotFoundMessage(postId));
 
-            if (!await _commonService.IsExistAsync<Post>(s => s.Id == model.PostId))
-                return Result<CommentViewModel>.NotFound(typeof(Post).NotFoundMessage(model.PostId));
+        var query = db.Comments.AsNoTracking();
 
-            if (!await _permissionCommentService.CanCreateCommentAsync(model.GroupId))
-                return Result<CommentViewModel>.Forbiden();
+        if (!await permissionCommentService.CanViewAllCommentsAsync(groupId, postId))
+            query = query.Where(s => s.IsPublic);
 
-            var newComment = new Comment
-            {
-                IsPublic = model.IsPublic,
-                PostId = model.PostId,
-                UserId = _identityService.GetUserId(),
-                Text = model.Text
-            };
-            newComment.PrepareToCreate(_identityService);
-            await _db.Comments.AddAsync(newComment);
-            await _db.SaveChangesAsync();
-            return Result<CommentViewModel>.Created(_mapper.Map<CommentViewModel>(newComment));
-        }
+        var comments = await query
+            .Where(x => x.PostId == postId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Include(x => x.User)
+            .Skip(skip).Take(count)
+            .ToListAsync();
 
-        public async Task<Result<List<CommentViewModel>>> GetCommentsByPostIdAsync(int groupId, int postId, int skip = 0, int count = 20)
-        {
-            if (!await _db.Posts.AnyAsync(s => s.Id == postId && s.GroupId == groupId))
-                return Result<List<CommentViewModel>>.NotFound(typeof(Post).NotFoundMessage(postId));
+        var totalCount = await db.Comments.CountAsync(x => x.PostId == postId);
 
-            var query = _db.Comments.AsNoTracking();
+        return Result<List<CommentViewModel>>.SuccessList(mapper.Map<List<CommentViewModel>>(comments), Meta.FromMeta(totalCount, skip, count));
+    }
 
-            if (!await _permissionCommentService.CanViewAllCommentsAsync(groupId, postId))
-                query = query.Where(s => s.IsPublic);
+    public async Task<Result<bool>> RemoveCommentAsync(int groupId, int postId, long commentId)
+    {
+        if (!await db.Posts.AsNoTracking().AnyAsync(s => s.Id == postId && s.GroupId == groupId))
+            return Result<bool>.NotFound("Post from this group not found");
 
-            var comments = await query
-                .Where(x => x.PostId == postId)
-                .OrderByDescending(s => s.CreatedAt)
-                .Include(x => x.User)
-                .Skip(skip).Take(count)
-                .ToListAsync();
+        var commentToRemove = await db.Comments.FirstOrDefaultAsync(s => s.Id == commentId);
+        if (commentToRemove == null)
+            return Result<bool>.NotFound(typeof(Comment).NotFoundMessage(commentId));
 
-            var totalCount = await _db.Comments.CountAsync(x => x.PostId == postId);
+        if (commentToRemove.PostId != postId)
+            return Result<bool>.Forbiden();
 
-            return Result<List<CommentViewModel>>.SuccessList(_mapper.Map<List<CommentViewModel>>(comments), Meta.FromMeta(totalCount, skip, count));
-        }
-
-        public async Task<Result<bool>> RemoveCommentAsync(int groupId, int postId, long commentId)
-        {
-            if (!await _db.Posts.AsNoTracking().AnyAsync(s => s.Id == postId && s.GroupId == groupId))
-                return Result<bool>.NotFound("Post from this group not found");
-
-            var commentToRemove = await _db.Comments.FirstOrDefaultAsync(s => s.Id == commentId);
-            if (commentToRemove == null)
-                return Result<bool>.NotFound(typeof(Comment).NotFoundMessage(commentId));
-
-            if (commentToRemove.PostId != postId)
+        if (!identityService.IsAdministrator())
+            if (commentToRemove.UserId != identityService.GetUserId())
                 return Result<bool>.Forbiden();
 
-            if (!_identityService.IsAdministrator())
-                if (commentToRemove.UserId != _identityService.GetUserId())
-                    return Result<bool>.Forbiden();
+        db.Comments.Remove(commentToRemove);
+        await db.SaveChangesAsync();
+        return Result<bool>.Success();
+    }
 
-            _db.Comments.Remove(commentToRemove);
-            await _db.SaveChangesAsync();
-            return Result<bool>.Success();
-        }
+    public async Task<Result<CommentViewModel>> UpdateCommentAsync(CommentEditModel model)
+    {
+        var commentToUpdate = await db.Comments.FindAsync(model.Id);
+        if (commentToUpdate == null)
+            return Result<CommentViewModel>.NotFound(typeof(Comment).NotFoundMessage(model.Id));
 
-        public async Task<Result<CommentViewModel>> UpdateCommentAsync(CommentEditModel model)
-        {
-            var commentToUpdate = await _db.Comments.FindAsync(model.Id);
-            if (commentToUpdate == null)
-                return Result<CommentViewModel>.NotFound(typeof(Comment).NotFoundMessage(model.Id));
+        if (!identityService.IsAdministrator())
+            if (commentToUpdate.UserId != identityService.GetUserId())
+                return Result<CommentViewModel>.Forbiden();
 
-            if (!_identityService.IsAdministrator())
-                if (commentToUpdate.UserId != _identityService.GetUserId())
-                    return Result<CommentViewModel>.Forbiden();
-
-            commentToUpdate.Text = model.Text;
-            commentToUpdate.IsPublic = model.IsPublic;
-            commentToUpdate.PrepareToUpdate(_identityService);
-            _db.Comments.Update(commentToUpdate);
-            await _db.SaveChangesAsync();
-            return Result<CommentViewModel>.SuccessWithData(_mapper.Map<CommentViewModel>(commentToUpdate));
-        }
+        commentToUpdate.Text = model.Text;
+        commentToUpdate.IsPublic = model.IsPublic;
+        commentToUpdate.PrepareToUpdate(identityService);
+        db.Comments.Update(commentToUpdate);
+        await db.SaveChangesAsync();
+        return Result<CommentViewModel>.SuccessWithData(mapper.Map<CommentViewModel>(commentToUpdate));
     }
 }

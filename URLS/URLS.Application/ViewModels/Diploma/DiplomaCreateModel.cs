@@ -1,12 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Diploma
+namespace URLS.Application.ViewModels.Diploma;
+
+public class DiplomaCreateModel
 {
-    public class DiplomaCreateModel
-    {
-        [Required, StringLength(5)]
-        public string Series { get; set; }
-        [Required]
-        public int Number { get; set; }
-    }
+    [Required, StringLength(5)]
+    public string Series { get; set; }
+    [Required]
+    public int Number { get; set; }
 }

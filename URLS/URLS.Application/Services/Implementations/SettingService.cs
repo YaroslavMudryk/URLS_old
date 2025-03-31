@@ -7,72 +7,63 @@ using URLS.Application.ViewModels.Setting;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class SettingService(
+    URLSDbContext db,
+    IMapper mapper,
+    IIdentityService identityService,
+    ICommonService commonService) : ISettingService
 {
-    public class SettingService : ISettingService
+    public async Task<Result<SettingViewModel>> CreateSettingAsync(SettingCreateModel model)
     {
-        private readonly URLSDbContext _db;
-        private readonly IMapper _mapper;
-        private readonly IIdentityService _identityService;
-        private readonly ICommonService _commonService;
-        public SettingService(URLSDbContext db, IMapper mapper, IIdentityService identityService, ICommonService commonService)
+        if (await commonService.CountAsync<Setting>() >= 1)
+            return Result<SettingViewModel>.Error("Can't create more then 1 item");
+
+        var newSetting = new Setting
         {
-            _db = db;
-            _mapper = mapper;
-            _identityService = identityService;
-            _commonService = commonService;
-        }
+            FirtsSemesterStart = model.FirtsSemesterStart,
+            FirtsSemesterEnd = model.FirtsSemesterEnd,
+            SecondSemesterStart = model.SecondSemesterStart,
+            SecondSemesterEnd = model.SecondSemesterEnd,
+            MaxCourseInUniversity = model.MaxCourseInUniversity,
+        };
+        newSetting.PrepareToCreate(identityService);
 
-        public async Task<Result<SettingViewModel>> CreateSettingAsync(SettingCreateModel model)
-        {
-            if (await _commonService.CountAsync<Setting>() >= 1)
-                return Result<SettingViewModel>.Error("Can't create more then 1 item");
+        await db.Settings.AddAsync(newSetting);
+        await db.SaveChangesAsync();
 
-            var newSetting = new Setting
-            {
-                FirtsSemesterStart = model.FirtsSemesterStart,
-                FirtsSemesterEnd = model.FirtsSemesterEnd,
-                SecondSemesterStart = model.SecondSemesterStart,
-                SecondSemesterEnd = model.SecondSemesterEnd,
-                MaxCourseInUniversity = model.MaxCourseInUniversity,
-            };
-            newSetting.PrepareToCreate(_identityService);
+        return Result<SettingViewModel>.Created(mapper.Map<SettingViewModel>(newSetting));
+    }
 
-            await _db.Settings.AddAsync(newSetting);
-            await _db.SaveChangesAsync();
+    public async Task<Result<Setting>> GetRootSettingAsync()
+    {
+        var setting = await db.Settings.AsNoTracking().FirstOrDefaultAsync();
+        if (setting == null)
+            return Result<Setting>.NotFound("Setting not found");
+        return Result<Setting>.SuccessWithData(setting);
+    }
 
-            return Result<SettingViewModel>.Created(_mapper.Map<SettingViewModel>(newSetting));
-        }
+    public async Task<Result<SettingViewModel>> UpdateSettingAsync(SettingEditModel model)
+    {
+        var settingToUpdate = await db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == model.Id);
+        if (settingToUpdate == null)
+            return Result<SettingViewModel>.NotFound("Setting not found");
 
-        public async Task<Result<Setting>> GetRootSettingAsync()
-        {
-            var setting = await _db.Settings.AsNoTracking().FirstOrDefaultAsync();
-            if (setting == null)
-                return Result<Setting>.NotFound("Setting not found");
-            return Result<Setting>.SuccessWithData(setting);
-        }
+        settingToUpdate.MaxCourseInUniversity = model.MaxCourseInUniversity;
+        settingToUpdate.FirtsSemesterStart = model.FirtsSemesterStart;
+        settingToUpdate.FirtsSemesterEnd = model.FirtsSemesterEnd;
+        settingToUpdate.SecondSemesterStart = model.SecondSemesterStart;
+        settingToUpdate.SecondSemesterEnd = model.SecondSemesterEnd;
+        settingToUpdate.DirectorSignature = model.DirectorSignature;
+        settingToUpdate.UniversityStamp = model.UniversityStamp;
+        settingToUpdate.Holidays = model.Holidays;
+        settingToUpdate.LessonTimes = model.LessonTimes;
+        settingToUpdate.PrepareToUpdate(identityService);
 
-        public async Task<Result<SettingViewModel>> UpdateSettingAsync(SettingEditModel model)
-        {
-            var settingToUpdate = await _db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == model.Id);
-            if (settingToUpdate == null)
-                return Result<SettingViewModel>.NotFound("Setting not found");
+        db.Settings.Update(settingToUpdate);
+        await db.SaveChangesAsync();
 
-            settingToUpdate.MaxCourseInUniversity = model.MaxCourseInUniversity;
-            settingToUpdate.FirtsSemesterStart = model.FirtsSemesterStart;
-            settingToUpdate.FirtsSemesterEnd = model.FirtsSemesterEnd;
-            settingToUpdate.SecondSemesterStart = model.SecondSemesterStart;
-            settingToUpdate.SecondSemesterEnd = model.SecondSemesterEnd;
-            settingToUpdate.DirectorSignature = model.DirectorSignature;
-            settingToUpdate.UniversityStamp = model.UniversityStamp;
-            settingToUpdate.Holidays = model.Holidays;
-            settingToUpdate.LessonTimes = model.LessonTimes;
-            settingToUpdate.PrepareToUpdate(_identityService);
-
-            _db.Settings.Update(settingToUpdate);
-            await _db.SaveChangesAsync();
-
-            return Result<SettingViewModel>.SuccessWithData(_mapper.Map<SettingViewModel>(settingToUpdate));
-        }
+        return Result<SettingViewModel>.SuccessWithData(mapper.Map<SettingViewModel>(settingToUpdate));
     }
 }

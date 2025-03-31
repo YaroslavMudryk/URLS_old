@@ -1,43 +1,42 @@
 ﻿using System.Net;
 using URLS.Constants.APIResponse;
 
-namespace URLS.Web.Middlewares
+namespace URLS.Web.Middlewares;
+
+public class GlobalErrorHandlerMiddleware
 {
-    public class GlobalErrorHandlerMiddleware
+    private readonly RequestDelegate _next;
+    public GlobalErrorHandlerMiddleware(RequestDelegate next)
     {
-        private readonly RequestDelegate _next;
-        public GlobalErrorHandlerMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
+        _next = next;
+    }
 
-        public async Task InvokeAsync(HttpContext httpContext)
+    public async Task InvokeAsync(HttpContext httpContext)
+    {
+        try
         {
-            try
-            {
-                await _next(httpContext);
-            }
-            catch (Exception ex)
-            {
-                await HandleExceptionAsync(httpContext, ex);
-                return;
-            }
+            await _next(httpContext);
         }
-
-        private async Task HandleExceptionAsync(HttpContext httpContext, Exception exception)
+        catch (Exception ex)
         {
-            var requestId = httpContext.TraceIdentifier;
-            httpContext.Response.ContentType = "application/json";
-            httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await httpContext.Response.WriteAsJsonAsync(new APIResponse(false, "Internal server error", exception.Message, requestId, null));
+            await HandleExceptionAsync(httpContext, ex);
+            return;
         }
     }
 
-    public static class GlobalErrorHandlerMiddlewareExtensions
+    private async Task HandleExceptionAsync(HttpContext httpContext, Exception exception)
     {
-        public static void UseGlobalErrorHandler(this IApplicationBuilder builder)
-        {
-            builder.UseMiddleware<GlobalErrorHandlerMiddleware>();
-        }
+        var requestId = httpContext.TraceIdentifier;
+        httpContext.Response.ContentType = "application/json";
+        httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+        await httpContext.Response.WriteAsJsonAsync(new APIResponse(false, "Internal server error", exception.Message, requestId, null));
+    }
+}
+
+public static class GlobalErrorHandlerMiddlewareExtensions
+{
+    public static void UseGlobalErrorHandler(this IApplicationBuilder builder)
+    {
+        builder.UseMiddleware<GlobalErrorHandlerMiddleware>();
     }
 }

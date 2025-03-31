@@ -1,10 +1,9 @@
-﻿namespace URLS.Constants.Extensions
+﻿namespace URLS.Constants.Extensions;
+
+public static class ClassExtensions
 {
-    public static class ClassExtensions
+    public static string NotFoundMessage(this Type type, object id)
     {
-        public static string NotFoundMessage(this Type type, object id)
-        {
-            return $"{type.Name} with ID ({id.ToString()}) not found";
-        }
+        return $"{type.Name} with ID ({id.ToString()}) not found";
     }
 }

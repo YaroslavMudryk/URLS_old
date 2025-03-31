@@ -1,7 +1,6 @@
-﻿namespace URLS.Application.ViewModels.News
+﻿namespace URLS.Application.ViewModels.News;
+
+public class WarNewsResponse
 {
-    public class WarNewsResponse
-    {
-        public List<CommonNewsResponse> Losses { get; set; }
-    }
+    public List<CommonNewsResponse> Losses { get; set; }
 }

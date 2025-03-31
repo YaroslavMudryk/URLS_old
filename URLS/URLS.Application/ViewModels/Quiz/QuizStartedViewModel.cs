@@ -1,8 +1,7 @@
-﻿namespace URLS.Application.ViewModels.Quiz
+﻿namespace URLS.Application.ViewModels.Quiz;
+
+public class QuizStartedViewModel
 {
-    public class QuizStartedViewModel
-    {
-        public QuizResultViewModel Result { get; set; }
-        public QuizViewModel Quiz { get; set; }
-    }
+    public QuizResultViewModel Result { get; set; }
+    public QuizViewModel Quiz { get; set; }
 }

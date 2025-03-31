@@ -1,9 +1,8 @@
-﻿namespace URLS.Domain.Models
+﻿namespace URLS.Domain.Models;
+
+public class QuizResultStatistics
 {
-    public class QuizResultStatistics
-    {
-        public int CountOfQuestions { get; set; }
-        public int CorrectAnswers { get; set; }
-        public int SkipedAnswers { get; set; }
-    }
+    public int CountOfQuestions { get; set; }
+    public int CorrectAnswers { get; set; }
+    public int SkipedAnswers { get; set; }
 }

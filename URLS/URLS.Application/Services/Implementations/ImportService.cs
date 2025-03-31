@@ -1,6 +1,4 @@
-﻿using ClosedXML;
-using ClosedXML.Excel;
-using Extensions.Converters;
+﻿using ClosedXML.Excel;
 using Extensions.Password;
 using Force.DeepCloner;
 using Microsoft.EntityFrameworkCore;
@@ -8,143 +6,134 @@ using URLS.Application.Extensions;
 using URLS.Application.Services.Interfaces;
 using URLS.Application.ViewModels;
 using URLS.Application.ViewModels.Export;
-using URLS.Application.ViewModels.Import;
 using URLS.Constants;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class ImportService(
+    URLSDbContext db,
+    IIdentityService identityService) : IImportService
 {
-    public class ImportService : IImportService
+    public async Task<Result<ExportViewModel>> ImportNewStudentsAsync(Stream stream)
     {
-        private readonly URLSDbContext _db;
-        private readonly IIdentityService _identityService;
-        public ImportService(URLSDbContext db, IIdentityService identityService)
+        using var importExcelFile = new XLWorkbook(stream);
+
+        using var exportExcelFile = new XLWorkbook();
+        exportExcelFile.Style.Font.FontSize = 14;
+
+        var countOfGroups = importExcelFile.Worksheets.Count();
+
+        var specialtyId = Convert.ToInt32(importExcelFile.Worksheets.ToArray()[0].Cell("A1").Value);
+
+        var specialty = await db.Specialties.FindAsync(specialtyId);
+
+        var userGroupRole = await db.UserGroupRoles.AsNoTracking().FirstOrDefaultAsync(s => s.UniqId == UserGroupRoles.UniqIds.Student);
+
+        List<Group> groups = new List<Group>();
+
+        foreach (var workSheetGroup in importExcelFile.Worksheets)
         {
-            _db = db;
-            _identityService = identityService;
-        }
+            var groupName = workSheetGroup.Name;
+            groupName = ValidateAndModifyIfNeeded(groupName);
 
-        public async Task<Result<ExportViewModel>> ImportNewStudentsAsync(Stream stream)
-        {
-            using var importExcelFile = new XLWorkbook(stream);
+            var newGroup = new Group();
+            newGroup.Name = groupName;
+            newGroup.Course = 1;
+            newGroup.SpecialtyId = specialtyId;
+            newGroup.StartStudy = DateTime.Today.GetStartStudy();
+            newGroup.EndStudy = DateTime.Today.GetEndStudy();
+            newGroup.IndexNumber = newGroup.Name.GetIndexForGroup();
+            newGroup.PrepareToCreate(identityService);
+            newGroup.UserGroups = new List<UserGroup>();
 
-            using var exportExcelFile = new XLWorkbook();
-            exportExcelFile.Style.Font.FontSize = 14;
+            var listOfStudents = new List<User>();
 
-            var countOfGroups = importExcelFile.Worksheets.Count();
+            var rows = workSheetGroup.RowsUsed().ToArray();
 
-            var specialtyId = Convert.ToInt32(importExcelFile.Worksheets.ToArray()[0].Cell("A1").Value);
-
-            var specialty = await _db.Specialties.FindAsync(specialtyId);
-
-            var userGroupRole = await _db.UserGroupRoles.AsNoTracking().FirstOrDefaultAsync(s => s.UniqId == UserGroupRoles.UniqIds.Student);
-
-            List<Group> groups = new List<Group>();
-
-            foreach (var workSheetGroup in importExcelFile.Worksheets)
+            for (int i = 2; i < rows.Count(); i++)
             {
-                var groupName = workSheetGroup.Name;
-                groupName = ValidateAndModifyIfNeeded(groupName);
+                var row = rows[i];
 
-                var newGroup = new Group();
-                newGroup.Name = groupName;
-                newGroup.Course = 1;
-                newGroup.SpecialtyId = specialtyId;
-                newGroup.StartStudy = DateTime.Today.GetStartStudy();
-                newGroup.EndStudy = DateTime.Today.GetEndStudy();
-                newGroup.IndexNumber = newGroup.Name.GetIndexForGroup();
-                newGroup.PrepareToCreate(_identityService);
-                newGroup.UserGroups = new List<UserGroup>();
+                var newStudent = row.GetStudent();
+                newStudent.ModifyUserFromImport();
+                listOfStudents.Add(newStudent.DeepClone());
 
-                var listOfStudents = new List<User>();
+                newStudent.IsActivateAccount = true;
+                newStudent.PasswordHash = newStudent.PasswordHash.GeneratePasswordHash();
+                newStudent.FromImport = true;
+                newStudent.SetLock(true);
+                newStudent.PrepareToCreate(identityService);
 
-                var rows = workSheetGroup.RowsUsed().ToArray();
-
-                for (int i = 2; i < rows.Count(); i++)
+                var newUserGroup = new UserGroup
                 {
-                    var row = rows[i];
-
-                    var newStudent = row.GetStudent();
-                    newStudent.ModifyUserFromImport();
-                    listOfStudents.Add(newStudent.DeepClone());
-
-                    newStudent.IsActivateAccount = true;
-                    newStudent.PasswordHash = newStudent.PasswordHash.GeneratePasswordHash();
-                    newStudent.FromImport = true;
-                    newStudent.SetLock(true);
-                    newStudent.PrepareToCreate(_identityService);
-
-                    var newUserGroup = new UserGroup
-                    {
-                        User = newStudent,
-                        Group = newGroup,
-                        IsAdmin = false,
-                        Status = UserGroupStatus.Member,
-                        Title = "Студент",
-                        UserGroupRoleId = userGroupRole.Id
-                    };
-                    newUserGroup.PrepareToCreate(_identityService);
-
-                    newGroup.UserGroups.Add(newUserGroup);
-                }
-
-                var currentWorkShit = exportExcelFile.AddWorksheet(groupName);
-
-                currentWorkShit.SetupStudents(listOfStudents);
-
-                var newInvite = new GroupInvite
-                {
-                    ActiveFrom = Defaults.GroupInviteActiveFrom,
-                    ActiveTo = Defaults.GroupInviteActiveTo,
-                    CodeJoin = Generator.CreateGroupInviteCode(),
+                    User = newStudent,
                     Group = newGroup,
-                    IsActive = true,
-                    Name = "Головне запрошення"
+                    IsAdmin = false,
+                    Status = UserGroupStatus.Member,
+                    Title = "Студент",
+                    UserGroupRoleId = userGroupRole.Id
                 };
+                newUserGroup.PrepareToCreate(identityService);
 
-                newInvite.PrepareToCreate();
-
-                newGroup.GroupInvites = new List<GroupInvite>();
-                newGroup.GroupInvites.Add(newInvite);
-                newGroup.PrepareToCreate(_identityService);
-                groups.Add(newGroup);
+                newGroup.UserGroups.Add(newUserGroup);
             }
 
-            var thisYear = DateTime.Today.GetStartStudy();
+            var currentWorkShit = exportExcelFile.AddWorksheet(groupName);
 
-            var isExistGroups = await _db.Groups.Where(s => groups.Select(c => c.Name).Contains(s.Name) && s.StartStudy == thisYear).ToListAsync();
+            currentWorkShit.SetupStudents(listOfStudents);
 
-            if (isExistGroups.Any())
+            var newInvite = new GroupInvite
             {
-                return Result<ExportViewModel>.Error($"Groups with name: ({string.Join(", ", isExistGroups.Select(s => s.Name))}) already present");
-            }
-
-            await _db.Groups.AddRangeAsync(groups);
-            await _db.SaveChangesAsync();
-
-            var fileName = $"{specialty.Name} ({DateTime.Now.ToString("HH:mm dd-MM-yyyy")})" + ".xlsx";
-
-            var exportModel = new ExportViewModel
-            {
-                FileName = fileName,
-                Stream = new MemoryStream()
+                ActiveFrom = Defaults.GroupInviteActiveFrom,
+                ActiveTo = Defaults.GroupInviteActiveTo,
+                CodeJoin = Generator.CreateGroupInviteCode(),
+                Group = newGroup,
+                IsActive = true,
+                Name = "Головне запрошення"
             };
 
-            exportExcelFile.SaveAs(exportModel.Stream);
-            exportModel.Stream.Position = 0;
+            newInvite.PrepareToCreate();
 
-            return Result<ExportViewModel>.SuccessWithData(exportModel);
+            newGroup.GroupInvites = [newInvite];
+            newGroup.PrepareToCreate(identityService);
+            groups.Add(newGroup);
         }
 
-        private string ValidateAndModifyIfNeeded(string groupName)
+        var thisYear = DateTime.Today.GetStartStudy();
+
+        var isExistGroups = await db.Groups.Where(s => groups.Select(c => c.Name).Contains(s.Name) && s.StartStudy == thisYear).ToListAsync();
+
+        if (isExistGroups.Any())
         {
-            if (groupName.Contains("-"))
-                return groupName;
-
-            var firstNumberIndex = groupName.IndexOfAny("0123456789".ToArray());
-
-            return groupName.Insert(firstNumberIndex, "-");
+            return Result<ExportViewModel>.Error($"Groups with name: ({string.Join(", ", isExistGroups.Select(s => s.Name))}) already present");
         }
+
+        await db.Groups.AddRangeAsync(groups);
+        await db.SaveChangesAsync();
+
+        var fileName = $"{specialty.Name} ({DateTime.Now.ToString("HH:mm dd-MM-yyyy")})" + ".xlsx";
+
+        var exportModel = new ExportViewModel
+        {
+            FileName = fileName,
+            Stream = new MemoryStream()
+        };
+
+        exportExcelFile.SaveAs(exportModel.Stream);
+        exportModel.Stream.Position = 0;
+
+        return Result<ExportViewModel>.SuccessWithData(exportModel);
+    }
+
+    private string ValidateAndModifyIfNeeded(string groupName)
+    {
+        if (groupName.Contains("-"))
+            return groupName;
+
+        var firstNumberIndex = groupName.IndexOfAny("0123456789".ToArray());
+
+        return groupName.Insert(firstNumberIndex, "-");
     }
 }

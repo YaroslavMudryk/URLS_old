@@ -1,7 +1,6 @@
-﻿namespace URLS.Application.ViewModels.News
+﻿namespace URLS.Application.ViewModels.News;
+
+public class CovidNewsReponse
 {
-    public class CovidNewsReponse
-    {
-        public List<CommonNewsResponse> Disease { get; set; }
-    }
+    public List<CommonNewsResponse> Disease { get; set; }
 }

@@ -1,35 +1,35 @@
 ﻿using FirebaseAdmin.Messaging;
-namespace URLS.Application.ViewModels.Firebase
+
+namespace URLS.Application.ViewModels.Firebase;
+
+public class PushResponse
 {
-    public class PushResponse
+    public int SuccessCount { get; set; }
+    public int FailureCount { get; set; }
+    public string Message { get; set; }
+    public List<SendResponse> Responses { get; set; }
+
+    public PushResponse(BatchResponse response)
     {
-        public int SuccessCount { get; set; }
-        public int FailureCount { get; set; }
-        public string Message { get; set; }
-        public List<SendResponse> Responses { get; set; }
+        SuccessCount = response.SuccessCount;
+        FailureCount = response.FailureCount;
+        Responses = response.Responses.ToList();
+    }
 
-        public PushResponse(BatchResponse response)
+    public PushResponse(List<BatchResponse> responses)
+    {
+        responses.ForEach(response =>
         {
-            SuccessCount = response.SuccessCount;
-            FailureCount = response.FailureCount;
-            Responses = response.Responses.ToList();
-        }
+            SuccessCount += response.SuccessCount;
+            FailureCount += response.FailureCount;
+            Responses.AddRange(response.Responses);
+        });
+    }
 
-        public PushResponse(List<BatchResponse> responses)
-        {
-            responses.ForEach(response =>
-            {
-                SuccessCount += response.SuccessCount;
-                FailureCount += response.FailureCount;
-                Responses.AddRange(response.Responses);
-            });
-        }
-
-        public PushResponse()
-        {
-            SuccessCount = 0;
-            FailureCount = 0;
-            Responses = new List<SendResponse>();
-        }
+    public PushResponse()
+    {
+        SuccessCount = 0;
+        FailureCount = 0;
+        Responses = [];
     }
 }

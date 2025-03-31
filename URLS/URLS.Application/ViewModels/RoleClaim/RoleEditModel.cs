@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.RoleClaim
+namespace URLS.Application.ViewModels.RoleClaim;
+
+public class RoleEditModel : RoleCreateModel
 {
-    public class RoleEditModel : RoleCreateModel
-    {
-        [Required]
-        public int Id { get; set; }
-    }
+    [Required]
+    public int Id { get; set; }
 }

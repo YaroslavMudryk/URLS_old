@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Group
+namespace URLS.Application.ViewModels.Group;
+
+public class GroupInviteEditModel : GroupInviteCreateModel
 {
-    public class GroupInviteEditModel : GroupInviteCreateModel
-    {
-        [Required]
-        public Guid Id { get; set; }
-    }
+    [Required]
+    public Guid Id { get; set; }
 }

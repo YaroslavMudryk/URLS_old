@@ -1,8 +1,7 @@
-﻿namespace URLS.Application.ViewModels.Export
+﻿namespace URLS.Application.ViewModels.Export;
+
+public class ExportViewModel
 {
-    public class ExportViewModel
-    {
-        public MemoryStream Stream { get; set; }
-        public string FileName { get; set; }
-    }
+    public MemoryStream Stream { get; set; }
+    public string FileName { get; set; }
 }

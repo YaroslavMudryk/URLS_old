@@ -2,58 +2,51 @@
 using URLS.Application.Services.Interfaces;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class PermissionCommentService(
+    URLSDbContext db,
+    IIdentityService identityService) : IPermissionCommentService
 {
-    public class PermissionCommentService : IPermissionCommentService
+    public async Task<bool> CanCreateCommentAsync(int groupId)
     {
-        private readonly URLSDbContext _db;
-        private readonly IIdentityService _identityService;
-        public PermissionCommentService(URLSDbContext db, IIdentityService identityService)
+        if (identityService.IsAdministrator())
+            return true;
+
+        var member = await db.UserGroups
+            .AsNoTracking()
+            .Include(s => s.UserGroupRole)
+            .FirstOrDefaultAsync(s => s.Status == Domain.Models.UserGroupStatus.Member && s.GroupId == groupId && s.UserId == identityService.GetUserId());
+
+        if (member == null)
         {
-            _db = db;
-            _identityService = identityService;
+            var subjects = await db.Subjects.AsNoTracking().Where(s => s.TeacherId == identityService.GetUserId() && s.GroupId == groupId).ToListAsync();
+            return subjects == null || subjects.Count == 0 ? false : true;
         }
-
-        public async Task<bool> CanCreateCommentAsync(int groupId)
+        else
         {
-            if (_identityService.IsAdministrator())
-                return true;
-
-            var member = await _db.UserGroups
-                .AsNoTracking()
-                .Include(s => s.UserGroupRole)
-                .FirstOrDefaultAsync(s => s.Status == Domain.Models.UserGroupStatus.Member && s.GroupId == groupId && s.UserId == _identityService.GetUserId());
-
-            if (member == null)
-            {
-                var subjects = await _db.Subjects.AsNoTracking().Where(s => s.TeacherId == _identityService.GetUserId() && s.GroupId == groupId).ToListAsync();
-                return subjects == null || subjects.Count == 0 ? false : true;
-            }
-            else
-            {
-                return member.UserGroupRole.Permissions.CanCreateComment;
-            }
+            return member.UserGroupRole.Permissions.CanCreateComment;
         }
+    }
 
-        public async Task<bool> CanViewAllCommentsAsync(int groupId, int postId)
+    public async Task<bool> CanViewAllCommentsAsync(int groupId, int postId)
+    {
+        if (identityService.IsAdministrator())
+            return true;
+
+        var member = await db.UserGroups
+            .AsNoTracking()
+            .Include(s => s.UserGroupRole)
+            .FirstOrDefaultAsync(s => s.Status == Domain.Models.UserGroupStatus.Member && s.GroupId == groupId && s.UserId == identityService.GetUserId());
+
+        if (member == null)
         {
-            if (_identityService.IsAdministrator())
-                return true;
-
-            var member = await _db.UserGroups
-                .AsNoTracking()
-                .Include(s => s.UserGroupRole)
-                .FirstOrDefaultAsync(s => s.Status == Domain.Models.UserGroupStatus.Member && s.GroupId == groupId && s.UserId == _identityService.GetUserId());
-
-            if (member == null)
-            {
-                var subjects = await _db.Subjects.AsNoTracking().Where(s => s.TeacherId == _identityService.GetUserId() && s.GroupId == groupId).ToListAsync();
-                return subjects == null || subjects.Count == 0 ? false : true;
-            }
-            else
-            {
-                return member.UserGroupRole.Permissions.CanCreateComment;
-            }
+            var subjects = await db.Subjects.AsNoTracking().Where(s => s.TeacherId == identityService.GetUserId() && s.GroupId == groupId).ToListAsync();
+            return subjects == null || subjects.Count == 0 ? false : true;
+        }
+        else
+        {
+            return member.UserGroupRole.Permissions.CanCreateComment;
         }
     }
 }

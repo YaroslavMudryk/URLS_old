@@ -1,20 +1,19 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Faculty
+namespace URLS.Application.ViewModels.Faculty;
+
+public class FacultyCreateModel
 {
-    public class FacultyCreateModel
+    [Required, StringLength(150, MinimumLength = 1)]
+    public string Name { get; set; }
+
+    public FacultyCreateModel()
     {
-        [Required, StringLength(150, MinimumLength = 1)]
-        public string Name { get; set; }
 
-        public FacultyCreateModel()
-        {
+    }
 
-        }
-
-        public FacultyCreateModel(FacultyViewModel model)
-        {
-            Name = model.Name;
-        }
+    public FacultyCreateModel(FacultyViewModel model)
+    {
+        Name = model.Name;
     }
 }

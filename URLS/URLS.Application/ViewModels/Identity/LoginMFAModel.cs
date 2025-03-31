@@ -1,8 +1,7 @@
-﻿namespace URLS.Application.ViewModels.Identity
+﻿namespace URLS.Application.ViewModels.Identity;
+
+public class LoginMFAModel
 {
-    public class LoginMFAModel
-    {
-        public string SessionId { get; set; }
-        public string Code { get; set; }
-    }
+    public string SessionId { get; set; }
+    public string Code { get; set; }
 }

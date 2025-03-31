@@ -1,7 +1,6 @@
-﻿namespace URLS.Application.ViewModels.Quiz
+﻿namespace URLS.Application.ViewModels.Quiz;
+
+public class QuestionEditModel : QuestionCreateModel
 {
-    public class QuestionEditModel : QuestionCreateModel
-    {
-        public int? Id { get; set; }
-    }
+    public int? Id { get; set; }
 }

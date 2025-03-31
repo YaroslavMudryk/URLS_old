@@ -1,8 +1,7 @@
-﻿namespace URLS.Constants.Localisation
+﻿namespace URLS.Constants.Localisation;
+
+public interface ILocalizeService
 {
-    public interface ILocalizeService
-    {
-        string[] SupportLanguages { get; }
-        string Get(string key);
-    }
+    string[] SupportLanguages { get; }
+    string Get(string key);
 }

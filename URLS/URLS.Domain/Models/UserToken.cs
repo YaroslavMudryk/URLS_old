@@ -1,7 +1,6 @@
-﻿namespace URLS.Domain.Models
-{
-    public class UserToken : BaseModel<int>
-    {
+﻿namespace URLS.Domain.Models;
 
-    }
+public class UserToken : BaseModel<int>
+{
+
 }

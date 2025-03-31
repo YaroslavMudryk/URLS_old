@@ -1,8 +1,7 @@
-﻿namespace URLS.Application.ViewModels.Identity
+﻿namespace URLS.Application.ViewModels.Identity;
+
+public class MFAViewModel
 {
-    public class MFAViewModel
-    {
-        public string ManualEntryKey { get; set; }
-        public string QrCodeImage { get; set; }
-    }
+    public string ManualEntryKey { get; set; }
+    public string QrCodeImage { get; set; }
 }

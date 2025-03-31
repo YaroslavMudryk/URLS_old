@@ -9,182 +9,173 @@ using URLS.Constants.APIResponse;
 using URLS.Domain.Models;
 using URLS.Infrastructure.Data.Context;
 
-namespace URLS.Application.Services.Implementations
+namespace URLS.Application.Services.Implementations;
+
+public class TimetableService(
+    IIdentityService identityService,
+    URLSDbContext db,
+    IMapper mapper,
+    ICommonService commonService) : ITimetableService
 {
-    public class TimetableService : ITimetableService
+    public async Task<Result<TimetableViewModel>> CreateTimetableAsync(TimetableCreateModel model)
     {
-        private readonly IIdentityService _identityService;
-        private readonly IMapper _mapper;
-        private readonly ICommonService _commonService;
-        private readonly URLSDbContext _db;
-        public TimetableService(IIdentityService identityService, URLSDbContext db, IMapper mapper, ICommonService commonService)
-        {
-            _identityService = identityService;
-            _db = db;
-            _mapper = mapper;
-            _commonService = commonService;
-        }
+        if (!await IsAvailableAsync(model))
+            return Result<TimetableViewModel>.Error("This time is busy");
+        var setting = await db.Settings.AsNoTracking().FirstOrDefaultAsync();
 
-        public async Task<Result<TimetableViewModel>> CreateTimetableAsync(TimetableCreateModel model)
+        var newTimetable = new Timetable
         {
-            if (!await IsAvailableAsync(model))
-                return Result<TimetableViewModel>.Error("This time is busy");
-            var setting = await _db.Settings.AsNoTracking().FirstOrDefaultAsync();
+            Date = model.Date,
+            SubjectId = model.SubjectId,
+            TeacherId = model.TeacherId,
+            Type = model.Type,
+            GroupId = model.GroupId
+        };
 
-            var newTimetable = new Timetable
+        var time = setting.LessonTimes.FirstOrDefault(t => t.Id == model.TimeId);
+        if (time != null)
+            newTimetable.Time = time;
+        else
+            return Result<TimetableViewModel>.Error("TimeID not valid value");
+
+        if (model.HolidayId.HasValue)
+        {
+            var holiday = setting.Holidays.FirstOrDefault(s => s.Id == model.HolidayId.Value);
+            if (holiday != null)
             {
-                Date = model.Date,
-                SubjectId = model.SubjectId,
-                TeacherId = model.TeacherId,
-                Type = model.Type,
-                GroupId = model.GroupId
-            };
-
-            var time = setting.LessonTimes.FirstOrDefault(t => t.Id == model.TimeId);
-            if (time != null)
-                newTimetable.Time = time;
+                newTimetable.IsHoliday = true;
+                newTimetable.Holiday = holiday;
+            }
             else
-                return Result<TimetableViewModel>.Error("TimeID not valid value");
+                return Result<TimetableViewModel>.Error("HolidayID not valid value");
+        }
 
-            if (model.HolidayId.HasValue)
+        newTimetable.PrepareToCreate(identityService);
+        await db.Timetables.AddAsync(newTimetable);
+        await db.SaveChangesAsync();
+
+        return Result<TimetableViewModel>.Created(mapper.Map<TimetableViewModel>(newTimetable));
+    }
+
+    public async Task<Result<List<TimetableViewModel>>> GetTimetableBetweenDatesAsync(int groupId, DateTime startDate, DateTime endDate)
+    {
+        if (!await commonService.IsExistAsync<Group>(s => s.Id == groupId))
+            return Result<List<TimetableViewModel>>.NotFound("Group not found");
+
+        ValidateDates(ref startDate, ref endDate);
+
+        var timetable = await db.Timetables
+            .AsNoTracking()
+            .Where(s => s.GroupId == groupId && s.Date >= startDate && s.Date <= endDate)
+            .Include(s => s.Teacher)
+            .Include(s => s.Subject)
+            .OrderBy(s => s.Date)
+            .ToListAsync();
+
+        var timetableToView = mapper.Map<List<TimetableViewModel>>(timetable);
+
+        return Result<List<TimetableViewModel>>.SuccessList(timetableToView, Meta.FromMeta(timetable.Count, 0, timetable.Count));
+    }
+
+    public async Task<Result<bool>> RemoveTimetableAsync(long[] ids)
+    {
+        var timetable = await db.Timetables
+            .AsNoTracking()
+            .Where(s => ids.Contains(s.Id))
+            .ToListAsync();
+
+        if (timetable == null || timetable.Count == 0)
+            return Result<bool>.NotFound("Items not found");
+
+        db.Timetables.RemoveRange(timetable);
+        await db.SaveChangesAsync();
+        return Result<bool>.Success();
+    }
+
+    public async Task<Result<bool>> RemoveTimetableAsync(int? groupId, int? subjectId, DateTime from, DateTime to)
+    {
+        ValidateDates(ref from, ref to);
+
+        var query = db.Timetables.AsNoTracking();
+
+        if (groupId.HasValue)
+            query = query.Where(s => s.GroupId == groupId);
+
+        if (subjectId.HasValue)
+            query = query.Where(s => s.SubjectId == subjectId);
+
+        query = query.Where(s => s.Date >= from && s.Date <= to);
+
+        var timetable = await query.ToListAsync();
+        db.Timetables.RemoveRange(timetable);
+        await db.SaveChangesAsync();
+        return Result<bool>.Success();
+    }
+
+    public async Task<Result<TimetableViewModel>> UpdateTimetableAsync(TimetableCreateModel model)
+    {
+        var currentTimetable = await db.Timetables.AsNoTracking().FirstOrDefaultAsync(s => s.Id == model.Id);
+        if (currentTimetable == null)
+            return Result<TimetableViewModel>.NotFound("Timetable not found");
+
+        var setting = await db.Settings.AsNoTracking().FirstOrDefaultAsync();
+
+        if (!await IsAvailableAsync(model))
+            return Result<TimetableViewModel>.Error("This time is busy");
+
+        currentTimetable.Type = model.Type;
+        var time = setting.LessonTimes.FirstOrDefault(t => t.Id == model.TimeId);
+        if (time != null)
+            currentTimetable.Time = time;
+        else
+            return Result<TimetableViewModel>.Error("TimeID not valid value");
+
+        if (model.HolidayId.HasValue)
+        {
+            var holiday = setting.Holidays.FirstOrDefault(s => s.Id == model.HolidayId.Value);
+            if (holiday != null)
             {
-                var holiday = setting.Holidays.FirstOrDefault(s => s.Id == model.HolidayId.Value);
-                if (holiday != null)
-                {
-                    newTimetable.IsHoliday = true;
-                    newTimetable.Holiday = holiday;
-                }
-                else
-                    return Result<TimetableViewModel>.Error("HolidayID not valid value");
+                currentTimetable.IsHoliday = true;
+                currentTimetable.Holiday = holiday;
             }
-
-            newTimetable.PrepareToCreate(_identityService);
-            await _db.Timetables.AddAsync(newTimetable);
-            await _db.SaveChangesAsync();
-
-            return Result<TimetableViewModel>.Created(_mapper.Map<TimetableViewModel>(newTimetable));
-        }
-
-        public async Task<Result<List<TimetableViewModel>>> GetTimetableBetweenDatesAsync(int groupId, DateTime startDate, DateTime endDate)
-        {
-            if (!await _commonService.IsExistAsync<Group>(s => s.Id == groupId))
-                return Result<List<TimetableViewModel>>.NotFound("Group not found");
-
-            ValidateDates(ref startDate, ref endDate);
-
-            var timetable = await _db.Timetables
-                .AsNoTracking()
-                .Where(s => s.GroupId == groupId && s.Date >= startDate && s.Date <= endDate)
-                .Include(s => s.Teacher)
-                .Include(s => s.Subject)
-                .OrderBy(s => s.Date)
-                .ToListAsync();
-
-            var timetableToView = _mapper.Map<List<TimetableViewModel>>(timetable);
-
-            return Result<List<TimetableViewModel>>.SuccessList(timetableToView, Meta.FromMeta(timetable.Count, 0, timetable.Count));
-        }
-
-        public async Task<Result<bool>> RemoveTimetableAsync(long[] ids)
-        {
-            var timetable = await _db.Timetables
-                .AsNoTracking()
-                .Where(s => ids.Contains(s.Id))
-                .ToListAsync();
-
-            if (timetable == null || timetable.Count == 0)
-                return Result<bool>.NotFound("Items not found");
-
-            _db.Timetables.RemoveRange(timetable);
-            await _db.SaveChangesAsync();
-            return Result<bool>.Success();
-        }
-
-        public async Task<Result<bool>> RemoveTimetableAsync(int? groupId, int? subjectId, DateTime from, DateTime to)
-        {
-            ValidateDates(ref from, ref to);
-
-            var query = _db.Timetables.AsNoTracking();
-
-            if (groupId.HasValue)
-                query = query.Where(s => s.GroupId == groupId);
-
-            if (subjectId.HasValue)
-                query = query.Where(s => s.SubjectId == subjectId);
-
-            query = query.Where(s => s.Date >= from && s.Date <= to);
-
-            var timetable = await query.ToListAsync();
-            _db.Timetables.RemoveRange(timetable);
-            await _db.SaveChangesAsync();
-            return Result<bool>.Success();
-        }
-
-        public async Task<Result<TimetableViewModel>> UpdateTimetableAsync(TimetableCreateModel model)
-        {
-            var currentTimetable = await _db.Timetables.AsNoTracking().FirstOrDefaultAsync(s => s.Id == model.Id);
-            if (currentTimetable == null)
-                return Result<TimetableViewModel>.NotFound("Timetable not found");
-
-            var setting = await _db.Settings.AsNoTracking().FirstOrDefaultAsync();
-
-            if (!await IsAvailableAsync(model))
-                return Result<TimetableViewModel>.Error("This time is busy");
-
-            currentTimetable.Type = model.Type;
-            var time = setting.LessonTimes.FirstOrDefault(t => t.Id == model.TimeId);
-            if (time != null)
-                currentTimetable.Time = time;
             else
-                return Result<TimetableViewModel>.Error("TimeID not valid value");
-
-            if (model.HolidayId.HasValue)
-            {
-                var holiday = setting.Holidays.FirstOrDefault(s => s.Id == model.HolidayId.Value);
-                if (holiday != null)
-                {
-                    currentTimetable.IsHoliday = true;
-                    currentTimetable.Holiday = holiday;
-                }
-                else
-                    return Result<TimetableViewModel>.Error("HolidayID not valid value");
-            }
-
-            currentTimetable.PrepareToUpdate(_identityService);
-            _db.Timetables.Update(currentTimetable);
-            await _db.SaveChangesAsync();
-
-            return Result<TimetableViewModel>.SuccessWithData(_mapper.Map<TimetableViewModel>(currentTimetable));
+                return Result<TimetableViewModel>.Error("HolidayID not valid value");
         }
 
-        private void ValidateDates(ref DateTime start, ref DateTime end)
+        currentTimetable.PrepareToUpdate(identityService);
+        db.Timetables.Update(currentTimetable);
+        await db.SaveChangesAsync();
+
+        return Result<TimetableViewModel>.SuccessWithData(mapper.Map<TimetableViewModel>(currentTimetable));
+    }
+
+    private void ValidateDates(ref DateTime start, ref DateTime end)
+    {
+        var diff = end - start;
+        if (start > end || diff.Days > 30)
         {
-            var diff = end - start;
-            if (start > end || diff.Days > 30)
-            {
-                start = DateTime.Today;
-                end = DateTime.Today.AddDays(14);
-            }
+            start = DateTime.Today;
+            end = DateTime.Today.AddDays(14);
         }
+    }
 
-        private async Task<bool> IsAvailableAsync(TimetableCreateModel model)
-        {
-            Expression<Func<Timetable, bool>> predicate = (x) =>
-            x.GroupId == model.GroupId &&
-            x.Date == model.Date;
+    private async Task<bool> IsAvailableAsync(TimetableCreateModel model)
+    {
+        Expression<Func<Timetable, bool>> predicate = (x) =>
+        x.GroupId == model.GroupId &&
+        x.Date == model.Date;
 
-            var items = await _db.Timetables
-                .AsNoTracking()
-                .Where(predicate)
-                .ToListAsync();
+        var items = await db.Timetables
+            .AsNoTracking()
+            .Where(predicate)
+            .ToListAsync();
 
-            var item = items.FirstOrDefault(s => s.Time.Id == model.TimeId);
-            if (model.Id.HasValue)
-                if (item.Id == model.Id.Value)
-                    return true;
-            if (item == null)
+        var item = items.FirstOrDefault(s => s.Time.Id == model.TimeId);
+        if (model.Id.HasValue)
+            if (item.Id == model.Id.Value)
                 return true;
-            return false;
-        }
+        if (item == null)
+            return true;
+        return false;
     }
 }

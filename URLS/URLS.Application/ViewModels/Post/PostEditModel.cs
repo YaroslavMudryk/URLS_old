@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Post
+namespace URLS.Application.ViewModels.Post;
+
+public class PostEditModel : PostCreateModel
 {
-    public class PostEditModel : PostCreateModel
-    {
-        [Required]
-        public int Id { get; set; }
-    }
+    [Required]
+    public int Id { get; set; }
 }

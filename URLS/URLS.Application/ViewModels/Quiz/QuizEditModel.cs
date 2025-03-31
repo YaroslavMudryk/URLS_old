@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace URLS.Application.ViewModels.Quiz
+namespace URLS.Application.ViewModels.Quiz;
+
+public class QuizEditModel : QuizCreateModel
 {
-    public class QuizEditModel : QuizCreateModel
-    {
-        [Required]
-        public Guid Id { get; set; }
-    }
+    [Required]
+    public Guid Id { get; set; }
 }

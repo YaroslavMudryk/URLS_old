@@ -1,7 +1,6 @@
-﻿namespace URLS.Application.ViewModels.Reaction
+﻿namespace URLS.Application.ViewModels.Reaction;
+
+public class ReactionStatistics
 {
-    public class ReactionStatistics
-    {
-        public Dictionary<string, int> Reactions { get; set; }
-    }
+    public Dictionary<string, int> Reactions { get; set; }
 }

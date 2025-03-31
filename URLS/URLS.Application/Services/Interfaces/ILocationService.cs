@@ -1,10 +1,8 @@
-﻿using URLS.Application.ViewModels.Location;
-using URLS.Domain.Models;
+﻿using URLS.Domain.Models;
 
-namespace URLS.Application.Services.Interfaces
+namespace URLS.Application.Services.Interfaces;
+
+public interface ILocationService
 {
-    public interface ILocationService
-    {
-        Task<Location> GetIpInfoAsync(string ip);
-    }
+    Task<Location> GetIpInfoAsync(string ip);
 }

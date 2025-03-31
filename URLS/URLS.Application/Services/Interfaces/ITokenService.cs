@@ -1,8 +1,8 @@
 ﻿using URLS.Application.ViewModels.Identity;
-namespace URLS.Application.Services.Interfaces
+
+namespace URLS.Application.Services.Interfaces;
+
+public interface ITokenService
 {
-    public interface ITokenService
-    {
-        Task<JwtToken> GetUserTokenAsync(UserTokenModel userToken);
-    }
+    Task<JwtToken> GetUserTokenAsync(UserTokenModel userToken);
 }
