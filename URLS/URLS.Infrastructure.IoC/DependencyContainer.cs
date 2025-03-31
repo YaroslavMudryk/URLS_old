@@ -18,8 +18,8 @@ namespace URLS.Infrastructure.IoC
             #region Db
             services.AddDbContext<URLSDbContext>(options =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("SqlServer"));
-                //options.UseNpgsql(configuration.GetConnectionString("PostgreSQL"));
+                //options.UseSqlServer(configuration.GetConnectionString("SqlServer"));
+                options.UseNpgsql(configuration.GetConnectionString("PostgreSQL"));
                 //options.UseSqlite(configuration.GetConnectionString("Sqlite"));
                 options.LogTo(Console.WriteLine, Microsoft.Extensions.Logging.LogLevel.Error);
             });            
